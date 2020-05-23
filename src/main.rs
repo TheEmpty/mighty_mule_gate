@@ -11,10 +11,9 @@ use http::header::HeaderValue;
 use gate::Gate;
 use gate::GateConfiguration;
 
-static SERVER_PORT: u16 = 3005; // TODO: move to JSON config
+static SERVER_PORT: u16 = 3005;
 
 static mut GATE: Gate = Gate {
-    // TODO: move GateConfiguration to JSON.
     configuration: GateConfiguration {
         time_to_move: std::time::Duration::from_secs(5),
         time_held_open: std::time::Duration::from_secs(15)
@@ -36,7 +35,6 @@ async fn router(req: Request<Body>) -> Result<Response<Body>, Infallible> {
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/") => {
             unsafe {
-                // TODO: handle err cases
                 let gate_json = serde_json::to_string(&GATE).unwrap();
                 let body = Body::from(gate_json);
                 let mut response = Response::new(body);
@@ -47,7 +45,6 @@ async fn router(req: Request<Body>) -> Result<Response<Body>, Infallible> {
 
         (&Method::POST, "/state") => {
             unsafe {
-                // TODO: handle err cases
                 let state = gate::State::from_str(params.get("desired_state").unwrap()).unwrap();
                 thread::spawn(|| {
                     GATE.change_state(state);

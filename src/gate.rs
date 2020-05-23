@@ -31,10 +31,6 @@ impl FromStr for State {
 
 pub struct GateConfiguration {
     pub time_to_move: time::Duration,
-    // TODO: will need a better way to know if the gate closes,
-    // eg if something is in its way.
-    // would be awesome to have a switch that is activated on open and one on closed.
-    // this would require some physical changes.
     pub time_held_open: time::Duration
 }
 
@@ -47,11 +43,6 @@ pub struct Gate {
     pub current_state: State
 }
 
-// TODO: a hold_state function. Will likely use something like
-// 'reference' counting so if multiple services demand the gate
-// stays held open, we wait until all of them release their lock.
-// We will probably also need to introduce an API to release all
-// the locks or provide a reasonable TTL for the locks/hold_state.
 impl Gate {
     // Note: this is a long running function and should be ran in a thread.
     pub fn change_state(&mut self, desired_state: State) -> () {
