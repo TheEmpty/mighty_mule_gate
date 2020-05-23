@@ -1,6 +1,6 @@
 use std::{thread, time};
 use std::str::FromStr;
-use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::sync::{RwLock, RwLockWriteGuard};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -65,10 +65,6 @@ impl Gate {
             current_state: RwLock::new(State::CLOSED),
             state_locks: vec!()
         }
-    }
-
-    pub fn get_state(&self) -> RwLockReadGuard<State> {
-        return self.current_state.read().unwrap();
     }
 
     // Note: this is a long running function and should be ran in a thread.
