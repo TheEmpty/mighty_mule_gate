@@ -47,6 +47,11 @@ pub struct Gate {
     pub current_state: State
 }
 
+// TODO: a hold_state function. Will likely use something like
+// 'reference' counting so if multiple services demand the gate
+// stays held open, we wait until all of them release their lock.
+// We will probably also need to introduce an API to release all
+// the locks or provide a reasonable TTL for the locks/hold_state.
 impl Gate {
     // Note: this is a long running function and should be ran in a thread.
     pub fn change_state(&mut self, desired_state: State) -> () {
@@ -63,23 +68,23 @@ impl Gate {
                 return;
             }
 
-            println!("Telling the gate to move!");
-            self.current_state = State::MOVING;
-            thread::sleep(self.configuration.time_to_move);
-            self.current_state = desired_state;
-            println!("Gate state changed to {:?}", self.current_state);
-            // TODO: if gate state was changed to open, after configured time, change to MOVING, change to closed.
+            self.move_to(desired_state);
             if self.current_state == State::OPEN {
                 thread::sleep(self.configuration.time_held_open);
                 // TODO: take lock - also duplication
                 if self.current_state == State::OPEN {
                     println!("Gate auto closing");
-                    self.current_state = State::MOVING;
-                    thread::sleep(self.configuration.time_to_move);
-                    self.current_state = State::CLOSED;
-                    println!("Gate closed");
+                    self.move_to(State::CLOSED);
                 }
             }
         }
+    }
+
+    fn move_to(&mut self, desired_state: State) -> () {
+        println!("Gate is moving!");
+        self.current_state = State::MOVING;
+        thread::sleep(self.configuration.time_to_move);
+        self.current_state = desired_state;
+        println!("Gate is now {:?}", self.current_state);
     }
 }
