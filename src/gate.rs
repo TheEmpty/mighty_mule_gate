@@ -1,7 +1,7 @@
 use std::{thread, time};
 use std::str::FromStr;
 use std::sync::{RwLock, RwLockWriteGuard};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Serialize)]
 pub enum State {
@@ -29,6 +29,7 @@ impl FromStr for State {
     }
 }
 
+#[derive(Deserialize)]
 pub struct GateConfiguration {
     pub time_to_move: time::Duration,
     pub time_held_open: time::Duration

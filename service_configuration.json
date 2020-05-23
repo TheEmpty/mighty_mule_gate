@@ -1,0 +1,13 @@
+{
+    "server_port": 3005,
+    "gate_configuration": {
+        "time_to_move": {
+            "secs": 5,
+            "nanos": 0
+        },
+        "time_held_open": {
+            "secs": 15,
+            "nanos": 0
+        }
+    }
+}

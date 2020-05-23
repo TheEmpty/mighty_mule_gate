@@ -1,4 +1,5 @@
 mod gate;
+mod service_configuration;
 
 use std::convert::Infallible;
 use std::net::SocketAddr;
@@ -11,8 +12,6 @@ use hyper::{Body, Method, Request, Response, Server, StatusCode};
 use http::header::HeaderValue;
 use gate::Gate;
 use gate::GateConfiguration;
-
-static SERVER_PORT: u16 = 3005;
 
 /*
 static mut GATE: Gate = Gate {
@@ -83,7 +82,9 @@ async fn router(req: Request<Body>) -> Result<Response<Body>, Infallible> {
 
 #[tokio::main]
 async fn main() {
-    let addr = SocketAddr::from(([0, 0, 0, 0], SERVER_PORT));
+    let conf = service_configuration::load();
+
+    let addr = SocketAddr::from(([0, 0, 0, 0], conf.server_port));
     let service = make_service_fn(|_conn| async {
         Ok::<_, Infallible>(service_fn(router))
     });
