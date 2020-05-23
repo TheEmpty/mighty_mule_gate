@@ -60,11 +60,33 @@ async fn router(req: Request<Body>) -> Result<Response<Body>, Infallible> {
 
         (&Method::POST, "/gate") => {
             unsafe {
-                let state = gate::State::from_str(params.get("desired_state").unwrap()).unwrap();
-                thread::spawn(move || {
-                    GATE.change_state(state);
-                });
-                let body = Body::from("{}");
+                let mut operation = false;
+
+                let desired_state_param = params.get("desired_state");
+                if desired_state_param.is_some() {
+                    operation = true;
+                    let desired_state = gate::State::from_str(desired_state_param.unwrap());
+                    if desired_state.is_ok() {
+                        thread::spawn(move || {
+                            GATE.change_state(desired_state.unwrap());
+                        });
+                    } else {
+                        let body = Body::from(format!("{{\"error\": \"Invalid state, {}\"}}", desired_state_param.unwrap()));
+                        let mut response = Response::new(body);
+                        *response.status_mut() = StatusCode::BAD_REQUEST;
+                        return Ok(response);
+                    }
+                }
+
+                if operation == false {
+                    let body = Body::from("{\"error\": \"no operation requested\"}");
+                    let mut response = Response::new(body);
+                    *response.status_mut() = StatusCode::BAD_REQUEST;
+                    return Ok(response);
+                }
+
+
+                let body = Body::from("{\"success\": true}");
                 let mut response = Response::new(body);
                 response.headers_mut().insert("Content-Type",  HeaderValue::from_str("application/json").unwrap());
                 return Ok(response);
