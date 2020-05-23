@@ -44,6 +44,8 @@ pub struct Gate {
 
 fn move_state(mut lock: RwLockWriteGuard<State>, desired_state: State, time_to_move: &time::Duration) -> () {
     println!("Gate is moving!");
+    // If desired_state = open, connect COM<->EXIT
+    // If desired_state = closed, connect COM<->CYCLE
     *lock = State::MOVING;
     thread::sleep(*time_to_move);
     *lock = desired_state;

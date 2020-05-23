@@ -13,7 +13,7 @@ expanded to non-salty uses-cases like using an RFID to recognize cars and
 having that call out to this micro service.
 
 ### TODO:
-* 'hold state', probably with a TTL to prevent a dead service from never freeing. (use case: gate is open when packages are out for delivery- another microservice will tell this application to hold the gate open until the package is delivered)
+* 'hold state', probably with a TTL to prevent a dead service from never freeing. (use case: gate is open when packages are out for delivery- another microservice will tell this application to hold the gate open until the package is delivered). Hold open = EXIT and then SAFETY. Hold closed = OPEN EDGE
 * test suite
 * possibly: a simple HTML page that has buttons to open, close, or hold gate.
 * better logging
