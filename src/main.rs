@@ -34,6 +34,13 @@ async fn router(req: Request<Body>) -> Result<Response<Body>, Infallible> {
 
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/") => {
+            let body = Body::from("Might Mule Gate API");
+            let mut response = Response::new(body);
+            response.headers_mut().insert("Content-Type", HeaderValue::from_str("text/plain").unwrap());
+            return Ok(response);
+        }
+
+        (&Method::GET, "/gate") => {
             unsafe {
                 let gate_json = serde_json::to_string(&GATE).unwrap();
                 let body = Body::from(gate_json);
@@ -43,7 +50,7 @@ async fn router(req: Request<Body>) -> Result<Response<Body>, Infallible> {
             }
         },
 
-        (&Method::POST, "/state") => {
+        (&Method::POST, "/gate") => {
             unsafe {
                 let state = gate::State::from_str(params.get("desired_state").unwrap()).unwrap();
                 thread::spawn(|| {
