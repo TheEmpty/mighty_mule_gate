@@ -11,25 +11,11 @@ use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server, StatusCode};
 use http::header::HeaderValue;
 use gate::Gate;
-use gate::GateConfiguration;
 
-/*
-static mut GATE: Gate = Gate {
-    configuration: GateConfiguration {
-        time_to_move: std::time::Duration::from_secs(5),
-        time_held_open: std::time::Duration::from_secs(15)
-    },
-    current_state: RwLock::new(gate::State::CLOSED)
-};
-*/
+static mut GATE: Option<Gate> = None;
 
+// TODO: break this up
 async fn router(req: Request<Body>) -> Result<Response<Body>, Infallible> {
-    // TODO: FIND OUT HOW TO MAKE THIS STATIC AGAIN.
-    let mut GATE = Gate::new(GateConfiguration {
-        time_to_move: std::time::Duration::from_secs(5),
-        time_held_open: std::time::Duration::from_secs(15)
-    });
-
     let params: HashMap<String, String> = req
         .uri()
         .query()
@@ -50,7 +36,7 @@ async fn router(req: Request<Body>) -> Result<Response<Body>, Infallible> {
 
         (&Method::GET, "/gate") => {
             unsafe {
-                let gate_json = serde_json::to_string(&GATE).unwrap();
+                let gate_json = serde_json::to_string(&(GATE.as_mut().unwrap())).unwrap();
                 let body = Body::from(gate_json);
                 let mut response = Response::new(body);
                 response.headers_mut().insert("Content-Type",  HeaderValue::from_str("application/json").unwrap());
@@ -68,7 +54,7 @@ async fn router(req: Request<Body>) -> Result<Response<Body>, Infallible> {
                     let desired_state = gate::State::from_str(desired_state_param.unwrap());
                     if desired_state.is_ok() {
                         thread::spawn(move || {
-                            GATE.change_state(desired_state.unwrap());
+                            GATE.as_mut().unwrap().change_state(desired_state.unwrap());
                         });
                     } else {
                         let body = Body::from(format!("{{\"error\": \"Invalid state, {}\"}}", desired_state_param.unwrap()));
@@ -102,9 +88,13 @@ async fn router(req: Request<Body>) -> Result<Response<Body>, Infallible> {
     }
 }
 
+
 #[tokio::main]
 async fn main() {
     let conf = service_configuration::load();
+    unsafe {
+        GATE = Some(Gate::new(conf.gate_configuration));
+    }
 
     let addr = SocketAddr::from(([0, 0, 0, 0], conf.server_port));
     let service = make_service_fn(|_conn| async {
