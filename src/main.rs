@@ -5,6 +5,7 @@ use std::net::SocketAddr;
 use std::str::FromStr;
 use std::thread;
 use std::collections::HashMap;
+use std::sync::RwLock;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server, StatusCode};
 use http::header::HeaderValue;
@@ -13,15 +14,23 @@ use gate::GateConfiguration;
 
 static SERVER_PORT: u16 = 3005;
 
+/*
 static mut GATE: Gate = Gate {
     configuration: GateConfiguration {
         time_to_move: std::time::Duration::from_secs(5),
         time_held_open: std::time::Duration::from_secs(15)
     },
-    current_state: gate::State::CLOSED
+    current_state: RwLock::new(gate::State::CLOSED)
 };
+*/
 
 async fn router(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+    // TODO: FIND OUT HOW TO MAKE THIS STATIC AGAIN.
+    let mut GATE = Gate::new(GateConfiguration {
+        time_to_move: std::time::Duration::from_secs(5),
+        time_held_open: std::time::Duration::from_secs(15)
+    });
+
     let params: HashMap<String, String> = req
         .uri()
         .query()
@@ -53,7 +62,7 @@ async fn router(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         (&Method::POST, "/gate") => {
             unsafe {
                 let state = gate::State::from_str(params.get("desired_state").unwrap()).unwrap();
-                thread::spawn(|| {
+                thread::spawn(move || {
                     GATE.change_state(state);
                 });
                 let body = Body::from("{}");
