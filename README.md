@@ -12,6 +12,11 @@ and opens the gate when packages are out for delivery. This can also be
 expanded to non-salty uses-cases like using an RFID to recognize cars and
 having that call out to this micro service.
 
+## How
+Will update after feature complete* with photos of install and general idea on setup.
+Right now only geared at developers that are comfortable to `git pull`
+and `cargo build`.
+
 ### TODO:
 * test suite
 * possibly: a simple HTML page that has buttons to open, close, or hold gate.
