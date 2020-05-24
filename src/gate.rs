@@ -44,7 +44,7 @@ pub struct GateConfiguration {
 pub struct Gate {
     #[serde(skip_serializing)]
     configuration: GateConfiguration,
-    current_state: RwLock<State>,
+    state: RwLock<State>,
     state_locks: Vec<LockStateLock>
 }
 
@@ -62,7 +62,7 @@ impl Gate {
     pub fn new(config: GateConfiguration) -> Gate {
         return Gate {
             configuration: config,
-            current_state: RwLock::new(State::CLOSED),
+            state: RwLock::new(State::CLOSED),
             state_locks: vec!()
         }
     }
@@ -78,7 +78,7 @@ impl Gate {
             return false;
         }
 
-        let state = self.current_state.write().unwrap();
+        let state = self.state.write().unwrap();
         if *state == desired_state {
             // TODO: trigger exit if state is OPEN so it resets timer
             // ^ would also then need to expire the thread thing below if
@@ -90,9 +90,9 @@ impl Gate {
             move_state(state, desired_state, &self.configuration.time_to_move);
         }
 
-        if *self.current_state.read().unwrap() == State::OPEN {
+        if *self.state.read().unwrap() == State::OPEN {
             thread::sleep(self.configuration.time_held_open);
-            let state = self.current_state.write().unwrap();
+            let state = self.state.write().unwrap();
             if *state == State::OPEN {
                 println!("Gate auto closing");
                 move_state(state, State::CLOSED, &self.configuration.time_to_move);
@@ -111,7 +111,7 @@ impl Gate {
     // return false if currently held in a different state.
     pub fn hold_state(&mut self, desired_state: State, ttl: time::Duration) -> bool {
         self.clear_expired_locks();
-        if self.state_locks.len() > 0 && desired_state != *self.current_state.read().unwrap() {
+        if self.state_locks.len() > 0 && desired_state != *self.state.read().unwrap() {
             // being held in a different state
             return false;
         }
@@ -121,7 +121,7 @@ impl Gate {
         };
         self.state_locks.push(lock);
 
-        let state = self.current_state.write().unwrap();
+        let state = self.state.write().unwrap();
         if *state != desired_state {
             move_state(state, desired_state, &self.configuration.time_to_move);
         }

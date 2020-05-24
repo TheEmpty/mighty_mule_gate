@@ -64,7 +64,7 @@ fn invalid_state_response(desired_state: &String) -> Response<Body> {
 
 fn set_desired_state(req: &Request<Body>) -> Option<Response<Body>> {
     let params = get_params(req);
-    let desired_state_param = params.get("desired_state").unwrap();
+    let desired_state_param = params.get("state").unwrap();
     let desired_state = gate::State::from_str(desired_state_param);
 
     if desired_state.is_ok() {
@@ -114,7 +114,7 @@ fn post_gate(req: Request<Body>) -> Response<Body> {
     let mut operation_taken = false;
     let params = get_params(&req);
 
-    if params.contains_key("desired_state") {
+    if params.contains_key("state") {
         operation_taken = true;
         let result = set_desired_state(&req);
         if result.is_some() {
