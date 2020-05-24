@@ -7,6 +7,7 @@ use std::fs::File;
 #[derive(Deserialize)]
 pub struct ServiceConfiguration {
     pub server_port: u16,
+    pub max_state_lock_ttl: std::time::Duration,
     pub gate_configuration: GateConfiguration
 }
 

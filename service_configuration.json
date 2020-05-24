@@ -1,5 +1,9 @@
 {
     "server_port": 3005,
+    "max_state_lock_ttl": {
+        "secs": 3600,
+        "nanos": 0
+    },
     "gate_configuration": {
         "time_to_move": {
             "secs": 5,
