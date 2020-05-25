@@ -1,7 +1,9 @@
 use std::{thread, time};
 use std::str::FromStr;
-use std::sync::{RwLock, RwLockWriteGuard};
 use serde::{Deserialize, Serialize};
+use gpio_cdev::{Chip, LineRequestFlags};
+
+// TODO: major cleanup
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum State {
@@ -31,102 +33,146 @@ impl FromStr for State {
 
 #[derive(Serialize, Deserialize)]
 struct LockStateLock {
+    id: String,
     expires: time::Duration
 }
 
 #[derive(Deserialize)]
 pub struct GateConfiguration {
-    pub time_to_move: time::Duration,
-    pub time_held_open: time::Duration
+    pub pull_to_open: bool,
+    pub gpio_motor: u32,
+    pub gpio_cycle_relay: u32,
+    pub gpio_exit_relay: u32,
+    pub gpio_master_orange: u32
 }
 
+// TODO: API will return own struct.
 #[derive(Serialize)]
 pub struct Gate {
     #[serde(skip_serializing)]
-    configuration: GateConfiguration,
-    state: RwLock<State>,
+    gpio_motor: gpio_cdev::LineHandle,
+    #[serde(skip_serializing)]
+    gpio_master_orange: gpio_cdev::LineHandle,
+    #[serde(skip_serializing)]
+    gpio_cycle_relay: gpio_cdev::LineHandle,
+    #[serde(skip_serializing)]
+    gpio_exit_relay: gpio_cdev::LineHandle,
+    pull_to_open: bool,
     state_locks: Vec<LockStateLock>
 }
 
-fn move_state(mut lock: RwLockWriteGuard<State>, desired_state: State, time_to_move: &time::Duration) -> () {
-    println!("Gate is moving!");
-    // If desired_state = open, connect COM<->EXIT
-    // If desired_state = closed, connect COM<->CYCLE
-    *lock = State::MOVING;
-    thread::sleep(*time_to_move);
-    *lock = desired_state;
-    println!("Gate is now {:?}", *lock);
+fn cycle_relay(pin: &gpio_cdev::LineHandle) {
+    pin.set_value(1);
+    thread::sleep(time::Duration::from_secs(1));
+    pin.set_value(0);
 }
 
 impl Gate {
     pub fn new(config: GateConfiguration) -> Gate {
+        let mut chip = Chip::new("/dev/gpiochip0").unwrap();
+
+        let motor_handle = chip.get_line(config.gpio_motor).unwrap().request(LineRequestFlags::INPUT, 0, "mighty_mule_gate").unwrap();
+        let master_orange_handle = chip.get_line(config.gpio_master_orange).unwrap().request(LineRequestFlags::INPUT, 0, "mighty_mule_gate").unwrap();
+        let exit_relay_handle = chip.get_line(config.gpio_exit_relay).unwrap().request(LineRequestFlags::OUTPUT, 0, "mighty_mule_gate").unwrap();
+        let cycle_relay_handle = chip.get_line(config.gpio_cycle_relay).unwrap().request(LineRequestFlags::OUTPUT, 0, "mighty_mule_gate").unwrap();
+
         return Gate {
-            configuration: config,
-            state: RwLock::new(State::CLOSED),
+            pull_to_open: config.pull_to_open,
+            gpio_motor: motor_handle,
+            gpio_exit_relay: exit_relay_handle,
+            gpio_cycle_relay: cycle_relay_handle,
+            gpio_master_orange: master_orange_handle,
             state_locks: vec!()
         }
     }
 
-    // Note: this is a long running function and should be ran in a thread.
-    // Moving to using switches on the gate will fix this as we don't have
-    // to use thread sleep to try and keep track of the gate's state.
-    pub fn change_state(&mut self, desired_state: State) -> bool {
-        self.clear_expired_locks();
+    pub fn get_state(&self) -> State {
+        // Note: there is technically a 'PAUSED' state too,
+        // but is not releveant to my current use-case.
+        if self.gpio_motor.get_value().unwrap() == 1 {
+            return State::MOVING;
+        } else if self.gpio_master_orange.get_value().unwrap() == 1 {
+            if self.pull_to_open {
+                return State::OPEN;
+            } else {
+                return State::CLOSED;
+            }
+        } else {
+            if self.pull_to_open {
+                return State::CLOSED;
+            } else {
+                return State::OPEN;
+            }
+        }
+    }
 
-        if self.state_locks.len() > 0 {
-            // doesn't really matter if the state is desired or not.
+    fn move_state(&mut self, desired_state: State) -> bool {
+        let state = self.get_state();
+        if state == State::MOVING {
+            // Could use CYCLE here, but then it could start going
+            // the wrong directions too.
             return false;
         }
 
-        let state = self.state.write().unwrap();
-        if *state == desired_state {
-            // TODO: trigger exit if state is OPEN so it resets timer
-            // ^ would also then need to expire the thread thing below if
-            // that sticks around for awhile. But should just get some switches
-            println!("Gate is already in desired state.");
-            return true;
-        } else {
-            // giving up the lock here by passing ownership.
-            move_state(state, desired_state, &self.configuration.time_to_move);
-        }
-
-        if *self.state.read().unwrap() == State::OPEN {
-            thread::sleep(self.configuration.time_held_open);
-            let state = self.state.write().unwrap();
-            if *state == State::OPEN {
-                println!("Gate auto closing");
-                move_state(state, State::CLOSED, &self.configuration.time_to_move);
+        if state != desired_state {
+            if desired_state == State::OPEN {
+                cycle_relay(&self.gpio_exit_relay);
+            } else { // State::CLOSED
+                cycle_relay(&self.gpio_cycle_relay);
             }
         }
 
         return true;
     }
 
+    pub fn change_state(&mut self, desired_state: State) -> bool {
+        self.sync();
+
+        if self.state_locks.len() > 0 {
+            return false;
+        }
+
+        return self.move_state(desired_state);
+    }
+
+    pub fn sync(&mut self) -> () {
+        self.clear_expired_locks();
+    }
+
     pub fn clear_expired_locks(&mut self) -> () {
+        if self.state_locks.len() == 0 {
+            return;
+        }
+
+        let previous_state = self.get_state();
         self.state_locks.retain(|lock| {
             lock.expires > time::SystemTime::now().duration_since(time::UNIX_EPOCH).unwrap()
         });
+
+        if previous_state == State::OPEN {
+            self.gpio_exit_relay.set_value(0);
+        }
     }
 
-    // return false if currently held in a different state.
     pub fn hold_state(&mut self, desired_state: State, ttl: time::Duration) -> bool {
-        self.clear_expired_locks();
-        if self.state_locks.len() > 0 && desired_state != *self.state.read().unwrap() {
+        self.sync();
+        if self.state_locks.len() > 0 && desired_state != self.get_state() {
             // being held in a different state
             return false;
         }
 
         let lock = LockStateLock {
+            id: "TODO: UUID".to_string(),
             expires: ttl + time::SystemTime::now().duration_since(time::UNIX_EPOCH).unwrap()
         };
         self.state_locks.push(lock);
 
-        let state = self.state.write().unwrap();
-        if *state != desired_state {
-            move_state(state, desired_state, &self.configuration.time_to_move);
+        if desired_state == State::OPEN {
+            self.gpio_exit_relay.set_value(1);
+        } else if self.get_state() != desired_state {
+            // FUTURE: For holding the gate closed, hold OPEN EDGE<->COM
+            self.move_state(desired_state);
         }
-        // then for OPEN, hold SAFETY<->COM
-        // For holding the gate closed, hold OPEN EDGE<->COM
 
         return true;
     }

@@ -19,8 +19,7 @@ and `cargo build`.
 
 ### TODO:
 * test suite
-* possibly: a simple HTML page that has buttons to open, close, or hold gate.
+* possibly: a simple HTML page that has buttons to manually invoke API(s).
 * logging
-* Add physical switches to the gate so the state is more accurate.
-* Add logic for setting relay pins high/low to actually move the gate instead of just logging
 * cleanup code closer to feature complete
+* Release a lock

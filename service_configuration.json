@@ -5,13 +5,10 @@
         "nanos": 0
     },
     "gate_configuration": {
-        "time_to_move": {
-            "secs": 5,
-            "nanos": 0
-        },
-        "time_held_open": {
-            "secs": 15,
-            "nanos": 0
-        }
+        "pull_to_open": true,
+        "gpio_cycle_relay": 6,
+        "gpio_exit_relay": 13,
+        "gpio_motor": 19,
+        "gpio_master_orange": 26
     }
 }

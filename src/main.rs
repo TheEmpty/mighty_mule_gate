@@ -21,7 +21,7 @@ async fn main() {
         Ok::<_, Infallible>(service_fn(server::handle))
     });
 
-    println!("Accepting traffic");
+    println!("Accepting traffic on {}", conf.server_port);
     let server = Server::bind(&addr).serve(service);
 
     if let Err(e) = server.await {
