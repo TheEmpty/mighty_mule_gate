@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 # Annoying that this won't compile on non-Linux...
 gpio-cdev = "0.2"
+uuid = { version = "0.8", features = ["serde", "v4"] }
 http = "0.2"
 url = "2.1"
 hyper = "0.13"

@@ -22,4 +22,3 @@ and `cargo build`.
 * possibly: a simple HTML page that has buttons to manually invoke API(s).
 * logging
 * cleanup code closer to feature complete
-* Release a lock

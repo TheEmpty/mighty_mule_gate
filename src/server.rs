@@ -94,8 +94,9 @@ fn set_desired_state(req: &Request<Body>) -> Option<Response<Body>> {
     }
 }
 
-fn lock_state(req: &Request<Body>) -> Option<Response<Body>> {
-    let params = get_params(req);
+// POST /lock
+fn lock_state(req: Request<Body>) -> Response<Body> {
+    let params = get_params(&req);
     let lock_state_param = params.get("lock_state").unwrap();
     let desired_state = gate::State::from_str(lock_state_param);
 
@@ -103,22 +104,44 @@ fn lock_state(req: &Request<Body>) -> Option<Response<Body>> {
         // TODO: Safety, also prob default TTL in config?
         let ttl_param = params.get("lock_state_ttl_seconds").unwrap();
         let ttl = std::time::Duration::from_secs(ttl_param.parse().unwrap());
-        let lock_added: bool;
+        let lock_added: Result<String, String>;
         unsafe {
             if ttl > MAX_STATE_LOCK_TTL.unwrap() {
                 let json_response = format!("{{\"error\": \"Requested TTL is greater than {:?}, the server limit.\"}}", MAX_STATE_LOCK_TTL.unwrap()).to_string();
-                return Some(easy_json_response(json_response));
+                return easy_json_response(json_response);
             }
             lock_added = GATE.as_mut().unwrap().hold_state(desired_state.unwrap(), ttl);
         }
-        if lock_added == false {
-            let json_response = "{\"error\": \"Could not move to desired_state. Most likely due to a lock to a different state.\"}".to_string();
-            return Some(easy_json_response(json_response));
+
+        let json_response: String;
+        if lock_added.is_ok() {
+            let id = lock_added.unwrap();
+            json_response = format!("{{\"id\": \"{}\"}}", id);
+        } else {
+            let error_message = lock_added.err();
+            json_response = format!("{{\"error\": \"{}\"}}", error_message.unwrap());
         }
-        return None;
+
+        return easy_json_response(json_response);
     } else {
-        return Some(invalid_state_response(lock_state_param));
+        return invalid_state_response(lock_state_param);
     }            
+}
+
+// DELETE /lock
+fn delete_lock_state(req: Request<Body>) -> Response<Body> {
+    let params = get_params(&req);
+    let id = params.get("id").unwrap();
+    let result: Result<(), ()>;
+    unsafe {
+        result = GATE.as_mut().unwrap().delete_lock(id);
+    }
+
+    if result.is_ok() {
+        return easy_json_response("{\"success\": true}".to_string());
+    } else {
+        return easy_json_response("{\"success\": false}".to_string());
+    }
 }
 
 // POST /gate
@@ -129,14 +152,6 @@ fn post_gate(req: Request<Body>) -> Response<Body> {
     if params.contains_key("state") {
         operation_taken = true;
         let result = set_desired_state(&req);
-        if result.is_some() {
-            return result.unwrap();
-        }
-    }
-
-    if params.contains_key("lock_state") {
-        operation_taken = true;
-        let result = lock_state(&req);
         if result.is_some() {
             return result.unwrap();
         }
@@ -169,7 +184,13 @@ pub async fn handle(req: Request<Body>) -> Result<Response<Body>, Infallible> {
         },
         (&Method::POST, "/gate") => {
             return Ok(post_gate(req));
-        }
+        },
+        (&Method::POST, "/lock") => {
+            return Ok(lock_state(req));
+        },
+        (&Method::DELETE, "/lock") => {
+            return Ok(delete_lock_state(req));
+        },
         _ => {
             return Ok(page_not_found());
         }

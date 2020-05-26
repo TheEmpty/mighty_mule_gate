@@ -1,6 +1,7 @@
 use std::{thread, time};
 use std::str::FromStr;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 use gpio_cdev::{Chip, LineRequestFlags};
 
 // TODO: major cleanup
@@ -140,6 +141,19 @@ impl Gate {
         self.clear_expired_locks();
     }
 
+    pub fn delete_lock(&mut self, id: &str) -> Result<(), ()> {
+        let mut index = 0;
+        for lock in &self.state_locks {
+            if lock.id == id {
+                self.state_locks.remove(index);
+                return Ok(());
+            }
+            index = index + 1;
+        }
+
+        return Err(());
+    }
+
     pub fn clear_expired_locks(&mut self) -> () {
         if self.state_locks.len() == 0 {
             return;
@@ -155,15 +169,15 @@ impl Gate {
         }
     }
 
-    pub fn hold_state(&mut self, desired_state: State, ttl: time::Duration) -> bool {
+    pub fn hold_state(&mut self, desired_state: State, ttl: time::Duration) -> Result<String, String> {
         self.sync();
         if self.state_locks.len() > 0 && desired_state != self.locked_state {
-            // being held in a different state
-            return false;
+            return Err(format!("Being held in {:?} state. Can't not change to holding {:?}.", self.locked_state, desired_state));
         }
 
+        let id = Uuid::new_v4().to_hyphenated();
         let lock = LockStateLock {
-            id: "TODO: UUID".to_string(),
+            id: id.to_string(),
             expires: ttl + time::SystemTime::now().duration_since(time::UNIX_EPOCH).unwrap()
         };
         self.state_locks.push(lock);
@@ -177,6 +191,6 @@ impl Gate {
 
         self.locked_state = desired_state;
 
-        return true;
+        return Ok(id.to_string());
     }
 }

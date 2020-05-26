@@ -16,6 +16,8 @@ async fn main() {
         server::MAX_STATE_LOCK_TTL = Some(conf.max_state_lock_ttl);
     }
 
+    // TODO: background thread to call Gate::sync()
+
     let addr = SocketAddr::from(([0, 0, 0, 0], conf.server_port));
     let service = make_service_fn(|_conn| async {
         Ok::<_, Infallible>(service_fn(server::handle))
