@@ -4,6 +4,7 @@ mod server;
 
 use std::convert::Infallible;
 use std::net::SocketAddr;
+use std::thread;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::Server;
 use gate::Gate;
@@ -16,7 +17,14 @@ async fn main() {
         server::MAX_STATE_LOCK_TTL = Some(conf.max_state_lock_ttl);
     }
 
-    // TODO: background thread to call Gate::sync()
+    thread::spawn(|| {
+        loop {
+            unsafe {
+                server::GATE.as_mut().unwrap().sync();
+            }
+            thread::sleep(std::time::Duration::from_secs(3));
+        }
+    });
 
     let addr = SocketAddr::from(([0, 0, 0, 0], conf.server_port));
     let service = make_service_fn(|_conn| async {
