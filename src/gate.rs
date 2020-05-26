@@ -31,8 +31,9 @@ impl FromStr for State {
     }
 }
 
-#[derive(Serialize, Deserialize)]
-struct LockStateLock {
+#[derive(Clone, Serialize)]
+pub struct LockStateLock {
+    #[serde(skip_serializing)]
     id: String,
     expires: time::Duration
 }
@@ -46,18 +47,13 @@ pub struct GateConfiguration {
     pub gpio_master_orange: u32
 }
 
-// TODO: API will return own struct.
-#[derive(Serialize)]
 pub struct Gate {
-    #[serde(skip_serializing)]
     gpio_motor: gpio_cdev::LineHandle,
-    #[serde(skip_serializing)]
     gpio_master_orange: gpio_cdev::LineHandle,
-    #[serde(skip_serializing)]
     gpio_cycle_relay: gpio_cdev::LineHandle,
-    #[serde(skip_serializing)]
     gpio_exit_relay: gpio_cdev::LineHandle,
     pull_to_open: bool,
+    locked_state: State,
     state_locks: Vec<LockStateLock>
 }
 
@@ -82,8 +78,13 @@ impl Gate {
             gpio_exit_relay: exit_relay_handle,
             gpio_cycle_relay: cycle_relay_handle,
             gpio_master_orange: master_orange_handle,
+            locked_state: State::CLOSED,
             state_locks: vec!()
         }
+    }
+
+    pub fn get_state_locks(&self) -> Vec<LockStateLock> {
+        return self.state_locks.clone();
     }
 
     pub fn get_state(&self) -> State {
@@ -106,7 +107,7 @@ impl Gate {
         }
     }
 
-    fn move_state(&mut self, desired_state: State) -> bool {
+    fn move_state(&mut self, desired_state: &State) -> bool {
         let state = self.get_state();
         if state == State::MOVING {
             // Could use CYCLE here, but then it could start going
@@ -114,8 +115,8 @@ impl Gate {
             return false;
         }
 
-        if state != desired_state {
-            if desired_state == State::OPEN {
+        if state != *desired_state {
+            if *desired_state == State::OPEN {
                 cycle_relay(&self.gpio_exit_relay);
             } else { // State::CLOSED
                 cycle_relay(&self.gpio_cycle_relay);
@@ -132,7 +133,7 @@ impl Gate {
             return false;
         }
 
-        return self.move_state(desired_state);
+        return self.move_state(&desired_state);
     }
 
     pub fn sync(&mut self) -> () {
@@ -156,7 +157,7 @@ impl Gate {
 
     pub fn hold_state(&mut self, desired_state: State, ttl: time::Duration) -> bool {
         self.sync();
-        if self.state_locks.len() > 0 && desired_state != self.get_state() {
+        if self.state_locks.len() > 0 && desired_state != self.locked_state {
             // being held in a different state
             return false;
         }
@@ -171,8 +172,10 @@ impl Gate {
             self.gpio_exit_relay.set_value(1);
         } else if self.get_state() != desired_state {
             // FUTURE: For holding the gate closed, hold OPEN EDGE<->COM
-            self.move_state(desired_state);
+            self.move_state(&desired_state);
         }
+
+        self.locked_state = desired_state;
 
         return true;
     }

@@ -3,11 +3,18 @@ use std::str::FromStr;
 use std::collections::HashMap;
 use hyper::{Body, Method, Request, Response, StatusCode};
 use http::header::HeaderValue;
+use serde::Serialize;
 use crate::gate::Gate;
 use crate::gate;
 
 pub static mut GATE: Option<Gate> = None;
 pub static mut MAX_STATE_LOCK_TTL: Option<std::time::Duration> = None;
+
+#[derive(Serialize)]
+struct GateAPIResponse {
+    pub state: gate::State,
+    pub locks: Vec<gate::LockStateLock>
+}
 
 fn get_params(req: &Request<Body>) -> HashMap<String, String> {
     return req
@@ -45,8 +52,13 @@ fn get_gate() -> Response<Body> {
     let gate_json: String;
     unsafe {
         let gate = GATE.as_mut().unwrap();
-        gate.clear_expired_locks();
-        gate_json = serde_json::to_string(&GATE).unwrap();
+        gate.sync();
+        let gate_api_response = GateAPIResponse {
+            state: gate.get_state(),
+            locks: gate.get_state_locks()
+        };
+
+        gate_json = serde_json::to_string(&gate_api_response).unwrap();
     };
 
     let body = Body::from(gate_json);
