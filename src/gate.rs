@@ -4,8 +4,6 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use gpio_cdev::{Chip, LineRequestFlags};
 
-// TODO: major cleanup
-
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum State {
     OPEN,
@@ -89,8 +87,6 @@ impl Gate {
     }
 
     pub fn get_state(&self) -> State {
-        // Note: there is technically a 'PAUSED' state too,
-        // but is not releveant to my current use-case.
         if self.gpio_motor.get_value().unwrap() == 1 {
             return State::MOVING;
         } else if self.gpio_master_orange.get_value().unwrap() == 1 {
@@ -111,8 +107,6 @@ impl Gate {
     fn move_state(&mut self, desired_state: &State) -> bool {
         let state = self.get_state();
         if state == State::MOVING {
-            // Could use CYCLE here, but then it could start going
-            // the wrong directions too.
             return false;
         }
 
@@ -201,7 +195,6 @@ impl Gate {
         if desired_state == State::OPEN {
             self.gpio_exit_relay.set_value(1);
         } else if self.get_state() != desired_state {
-            // FUTURE: For holding the gate closed, hold OPEN EDGE<->COM
             self.move_state(&desired_state);
         }
 

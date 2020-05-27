@@ -103,7 +103,7 @@ fn lock_state(req: Request<Body>) -> Response<Body> {
     let desired_state = gate::State::from_str(lock_state_param);
 
     if desired_state.is_ok() {
-        // TODO: Safety, also prob default TTL in config?
+        // TODO: better care around unwraps
         let ttl_param = params.get("lock_state_ttl_seconds").unwrap();
         let ttl = std::time::Duration::from_secs(ttl_param.parse().unwrap());
         let lock_added: Result<String, String>;

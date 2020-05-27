@@ -89,6 +89,24 @@ Returns a single field, success, as a boolean. Eg,
 
 ### TODO:
 * test suite
-* possibly: a simple HTML page that has buttons to manually invoke API(s).
 * logging
 * cleanup code closer to feature complete
+
+### Future improvements
+Things that I don't need, but would make this more feature complete.
+I may do them if someone were to care or if I need an excuse to
+[Rust](https://www.rust-lang.org/) more.
+
+* `GET /` serves a simple HTML page that has buttons to manually invoke API(s).
+  Possibly clear all locks should a long TTL ID be lost by a client.
+* API Keys; Allow more security for the service.
+* When the gate locked state is 'closed', hold 'OPEN EDGE' and 'COM'.
+  This would prevent the openers from opening the gate when locked
+  in the 'closed' state. Should probably be a feature enabled via
+  service_config.json since this could be confusing.
+* Support changing the state when the gate is `MOVING`.
+* Add support for the `PAUSED` state. This may be hard to detect with
+  the current configuration. The `PAUSED` state is when you press the clicker
+  while the gate in moving. It stops/pauses where it is. I believe the gate does
+  not return to a open or closed state until something triggers it again. Eg, it
+  does not use the 'time to close' pot in this state.
