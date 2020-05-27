@@ -6,7 +6,7 @@ use gpio_cdev::{Chip, LineRequestFlags};
 
 // TODO: major cleanup
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum State {
     OPEN,
     MOVING,
@@ -174,6 +174,14 @@ impl Gate {
     fn clear_lock_state_if_required(&mut self) -> () {
         if self.locked_state == State::OPEN && self.state_locks.len() == 0 {
             self.gpio_exit_relay.set_value(0);
+        }
+    }
+
+    pub fn get_locked_state(&mut self) -> Option<State> {
+        if self.state_locks.len() == 0 {
+            return None;
+        } else {
+            return Some(self.locked_state);
         }
     }
 

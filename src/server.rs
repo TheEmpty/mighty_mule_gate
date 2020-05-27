@@ -13,6 +13,7 @@ pub static mut MAX_STATE_LOCK_TTL: Option<std::time::Duration> = None;
 #[derive(Serialize)]
 struct GateAPIResponse {
     pub state: gate::State,
+    pub locked_state: Option<gate::State>,
     pub locks: Vec<gate::LockStateLock>
 }
 
@@ -55,6 +56,7 @@ fn get_gate() -> Response<Body> {
         gate.sync();
         let gate_api_response = GateAPIResponse {
             state: gate.get_state(),
+            locked_state: gate.get_locked_state(),
             locks: gate.get_state_locks()
         };
 
