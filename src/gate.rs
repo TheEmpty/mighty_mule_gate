@@ -3,7 +3,7 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use gpio_cdev::{Chip, LineRequestFlags};
-use log::{debug, info};
+use log::{trace, debug, info, warn};
 
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum State {
@@ -89,14 +89,17 @@ impl Gate {
 
     pub fn get_state(&self) -> State {
         if self.gpio_motor.get_value().unwrap() == 1 {
+            trace!("GPIO motor pin was high");
             return State::MOVING;
         } else if self.gpio_master_orange.get_value().unwrap() == 1 {
+            trace!("GPIO master orange was high");
             if self.pull_to_open {
                 return State::OPEN;
             } else {
                 return State::CLOSED;
             }
         } else {
+            trace!("Neither GPIO motor pin or master orange, was high.");
             if self.pull_to_open {
                 return State::CLOSED;
             } else {
@@ -112,6 +115,7 @@ impl Gate {
         }
 
         if state != *desired_state {
+            info!("Gate moving to {:?} from {:?}.", desired_state, state);
             if *desired_state == State::OPEN {
                 cycle_relay(&self.gpio_exit_relay);
             } else { // State::CLOSED
@@ -126,7 +130,7 @@ impl Gate {
         self.sync();
 
         if self.state_locks.len() > 0 {
-            debug!("Rejecting change_state request due to locks");
+            debug!("Tried to move the gate while the state was locked");
             return false;
         }
 
@@ -146,12 +150,14 @@ impl Gate {
         for lock in &self.state_locks {
             if lock.id == id {
                 self.state_locks.remove(index);
+                debug!("Removed lock {}", id);
                 self.clear_lock_state_if_required();
                 return Ok(());
             }
             index = index + 1;
         }
 
+        info!("Did not find a lock with ID {}", id);
         return Err(());
     }
 
@@ -160,9 +166,14 @@ impl Gate {
             return;
         }
 
+        let previous_lock_count = self.state_locks.len();
         self.state_locks.retain(|lock| {
             lock.expires > time::SystemTime::now().duration_since(time::UNIX_EPOCH).unwrap()
         });
+        let new_lock_count = self.state_locks.len();
+        if previous_lock_count > new_lock_count {
+            info!("Locks went from {} -> {}", previous_lock_count, new_lock_count);
+        }
 
         self.clear_lock_state_if_required();
     }
@@ -173,6 +184,7 @@ impl Gate {
         }
 
         if self.locked_state == State::OPEN && self.state_locks.len() == 0 {
+            debug!("Set GPIO exit relay to low");
             self.gpio_exit_relay.set_value(0);
         }
     }
@@ -188,6 +200,7 @@ impl Gate {
     pub fn hold_state(&mut self, desired_state: State, ttl: time::Duration) -> Result<String, String> {
         self.sync();
         if self.state_locks.len() > 0 && desired_state != self.locked_state {
+            warn!("Can not change locked state to {:?}. Already locked in {:?}.", desired_state, self.locked_state);
             return Err(format!("Being held in {:?} state. Can not change to holding {:?}.", self.locked_state, desired_state));
         }
 
@@ -204,8 +217,9 @@ impl Gate {
         self.state_locks.push(lock);
 
         if desired_state == State::OPEN {
+            debug!("Set GPIO exit relay to high");
             self.gpio_exit_relay.set_value(1);
-        } else if self.get_state() != desired_state {
+        } else if self.get_state() != desired_state { // State::CLOSED
             self.move_state(&desired_state);
         }
 
