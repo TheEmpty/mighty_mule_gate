@@ -188,7 +188,7 @@ impl Gate {
     pub fn hold_state(&mut self, desired_state: State, ttl: time::Duration) -> Result<String, String> {
         self.sync();
         if self.state_locks.len() > 0 && desired_state != self.locked_state {
-            return Err(format!("Being held in {:?} state. Can't not change to holding {:?}.", self.locked_state, desired_state));
+            return Err(format!("Being held in {:?} state. Can not change to holding {:?}.", self.locked_state, desired_state));
         }
 
         let id = Uuid::new_v4().to_hyphenated();

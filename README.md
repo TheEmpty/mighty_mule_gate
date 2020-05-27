@@ -73,7 +73,7 @@ Example success,
 Example failure,
 ```
 {
-    "error": "Being held in OPEN state. Can't not change to holding CLOSED."
+    "error": "Being held in OPEN state. Can not change to holding CLOSED."
 }
 ```
 
