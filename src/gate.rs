@@ -106,7 +106,7 @@ impl Gate {
 
     fn move_state(&mut self, desired_state: &State) -> bool {
         let state = self.get_state();
-        if state == State::MOVING {
+        if state == State::MOVING || *desired_state == State::MOVING {
             return false;
         }
 
@@ -183,6 +183,10 @@ impl Gate {
         self.sync();
         if self.state_locks.len() > 0 && desired_state != self.locked_state {
             return Err(format!("Being held in {:?} state. Can not change to holding {:?}.", self.locked_state, desired_state));
+        }
+
+        if desired_state == State::MOVING {
+            return Err("Gate can not be locked to the moving state.".to_string());
         }
 
         let id = Uuid::new_v4().to_hyphenated();
