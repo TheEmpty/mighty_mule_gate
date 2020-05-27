@@ -8,9 +8,11 @@ use std::thread;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::Server;
 use gate::Gate;
+use log::{info, error, trace};
 
 #[tokio::main]
 async fn main() {
+    pretty_env_logger::init();
     let conf = service_configuration::load();
     unsafe {
         server::GATE = Some(Gate::new(conf.gate_configuration));
@@ -19,6 +21,7 @@ async fn main() {
 
     thread::spawn(|| {
         loop {
+            trace!("Calling gate sync from thread.");
             unsafe {
                 server::GATE.as_mut().unwrap().sync();
             }
@@ -31,10 +34,10 @@ async fn main() {
         Ok::<_, Infallible>(service_fn(server::handle))
     });
 
-    println!("Accepting traffic on {}", conf.server_port);
+    info!("Accepting traffic on {}", conf.server_port);
     let server = Server::bind(&addr).serve(service);
 
     if let Err(e) = server.await {
-        eprintln!("server error: {}", e);
+        error!("server error: {}", e);
     }
 }

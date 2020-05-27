@@ -3,6 +3,7 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use gpio_cdev::{Chip, LineRequestFlags};
+use log::{debug, info};
 
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum State {
@@ -125,6 +126,7 @@ impl Gate {
         self.sync();
 
         if self.state_locks.len() > 0 {
+            debug!("Rejecting change_state request due to locks");
             return false;
         }
 
@@ -166,6 +168,10 @@ impl Gate {
     }
 
     fn clear_lock_state_if_required(&mut self) -> () {
+        if self.state_locks.len() == 0 {
+            info!("All locks removed from gate. Was held in {:?}.", self.locked_state);
+        }
+
         if self.locked_state == State::OPEN && self.state_locks.len() == 0 {
             self.gpio_exit_relay.set_value(0);
         }
@@ -190,6 +196,7 @@ impl Gate {
         }
 
         let id = Uuid::new_v4().to_hyphenated();
+        debug!("Issued a lock with ID {} for {:?}.", id.to_string(), &desired_state);
         let lock = LockStateLock {
             id: id.to_string(),
             expires: ttl + time::SystemTime::now().duration_since(time::UNIX_EPOCH).unwrap()
