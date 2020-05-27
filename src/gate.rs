@@ -142,10 +142,15 @@ impl Gate {
     }
 
     pub fn delete_lock(&mut self, id: &str) -> Result<(), ()> {
+        if self.state_locks.len() == 0 {
+            return Err(());
+        }
+
         let mut index = 0;
         for lock in &self.state_locks {
             if lock.id == id {
                 self.state_locks.remove(index);
+                self.clear_lock_state_if_required();
                 return Ok(());
             }
             index = index + 1;
@@ -154,17 +159,20 @@ impl Gate {
         return Err(());
     }
 
-    pub fn clear_expired_locks(&mut self) -> () {
+    fn clear_expired_locks(&mut self) -> () {
         if self.state_locks.len() == 0 {
             return;
         }
 
-        let previous_state = self.get_state();
         self.state_locks.retain(|lock| {
             lock.expires > time::SystemTime::now().duration_since(time::UNIX_EPOCH).unwrap()
         });
 
-        if previous_state == State::OPEN {
+        self.clear_lock_state_if_required();
+    }
+
+    fn clear_lock_state_if_required(&mut self) -> () {
+        if self.locked_state == State::OPEN && self.state_locks.len() == 0 {
             self.gpio_exit_relay.set_value(0);
         }
     }
